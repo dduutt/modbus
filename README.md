@@ -172,47 +172,80 @@ defer client.Close()
 
 ## 常用 API
 
+下面示例假设已经创建好 `client`，并在业务函数中统一处理错误：
+
+```go
+func useClient(ctx context.Context, client *modbus.Client) error {
+	coils, err := client.ReadCoils(ctx, 0, 8)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("coils: %#v\n", coils)
+
+	if err := client.WriteSingleCoil(ctx, 0, true); err != nil {
+		return err
+	}
+
+	registers, err := client.ReadHoldingRegisters(ctx, 0, 3)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("holding registers: %#v\n", registers)
+
+	if err := client.WriteSingleRegister(ctx, 1, 222); err != nil {
+		return err
+	}
+
+	if err := client.WriteMultipleRegisters(ctx, 10, []uint16{11, 22, 33}); err != nil {
+		return err
+	}
+
+	return nil
+}
+```
+
+等价的单项 API 包括：
+
 ```go
 coils, err := client.ReadCoils(ctx, 0, 8)
-_ = coils
-_ = err
-
-err = client.WriteSingleCoil(ctx, 0, true)
-_ = err
-
 registers, err := client.ReadHoldingRegisters(ctx, 0, 3)
-_ = registers
-_ = err
-
+err = client.WriteSingleCoil(ctx, 0, true)
 err = client.WriteSingleRegister(ctx, 1, 222)
-_ = err
-
 err = client.WriteMultipleRegisters(ctx, 10, []uint16{11, 22, 33})
-_ = err
 ```
 
 高级功能码：
 
 ```go
 diagnosticValue, err := client.Diagnostic(ctx, 0x0000, 0xCAFE)
-_ = diagnosticValue
-_ = err
+if err != nil {
+	return err
+}
+fmt.Printf("diagnostic: 0x%04X\n", diagnosticValue)
 
 exceptionStatus, err := client.ReadExceptionStatus(ctx)
-_ = exceptionStatus
-_ = err
+if err != nil {
+	return err
+}
+fmt.Printf("exception status: 0x%02X\n", exceptionStatus)
 
 counter, err := client.GetCommEventCounter(ctx)
-_ = counter
-_ = err
+if err != nil {
+	return err
+}
+fmt.Printf("event counter: %#v\n", counter)
 
 eventLog, err := client.GetCommEventLog(ctx)
-_ = eventLog
-_ = err
+if err != nil {
+	return err
+}
+fmt.Printf("event log: %#v\n", eventLog)
 
 serverID, err := client.ReportServerID(ctx)
-_ = serverID
-_ = err
+if err != nil {
+	return err
+}
+fmt.Printf("server id: % X\n", serverID)
 ```
 
 文件记录：
@@ -222,9 +255,9 @@ records, err := client.ReadFileRecords(ctx, []modbus.FileRecordRequest{
 	{FileNumber: 7, RecordNumber: 0, RecordLength: 2},
 })
 if err != nil {
-	panic(err)
+	return err
 }
-_ = records
+fmt.Printf("file records: %#v\n", records)
 ```
 
 FIFO：
@@ -232,9 +265,9 @@ FIFO：
 ```go
 fifoValues, err := client.ReadFIFOQueue(ctx, 0x04DE)
 if err != nil {
-	panic(err)
+	return err
 }
-_ = fifoValues
+fmt.Printf("fifo: %#v\n", fifoValues)
 ```
 
 设备识别：
@@ -242,10 +275,10 @@ _ = fifoValues
 ```go
 deviceInfo, err := client.ReadDeviceIdentification(ctx, modbus.ReadDeviceIDCodeBasic)
 if err != nil {
-	panic(err)
+	return err
 }
 vendorName := string(deviceInfo.Objects[0x00])
-_ = vendorName
+fmt.Printf("vendor: %s\n", vendorName)
 ```
 
 ## 从站模拟

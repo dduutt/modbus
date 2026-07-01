@@ -8,7 +8,7 @@
 
 - Modbus TCP 客户端，支持 MBAP 编解码、事务 ID 校验、Unit ID 校验。
 - Modbus RTU 客户端，基于调用方传入的 `io.ReadWriteCloser`。
-- RTU-over-TCP 客户端，适用于 TCP 透明转发 RTU ADU 的串口网关、LoRa 网关等设备。
+- RTU-over-TCP 客户端，适用于 TCP 透明转发 RTU ADU 的网关设备。
 - TCP 从站模拟。
 - RTU 从站模拟。
 - 线程安全的内存 `DataStore`，适合测试、模拟器和本地联调。
@@ -420,7 +420,6 @@ go run ./examples/tcp_client_advanced
 go run ./examples/rtu_slave
 go run ./examples/rtu_client
 go run ./examples/rtu_over_tcp_loopback
-go run ./examples/serial_gateway_loopback -serial COM4 -gateway 10.83.2.40:1234
 go run ./examples/tags
 go run ./examples/tags_loopback
 go run ./examples/advanced_loopback
@@ -455,40 +454,6 @@ go test -count=1 ./...
 go vet ./...
 go test -race -count=1 ./...
 ```
-
-## LoRa 网关链路测试
-
-当前硬件链路：
-
-```text
-PC TCP client -> LoRa 网关 10.83.2.40:1234 -> LoRa 空口 -> LoRa 节点 -> 节点串口 -> PC COM4 RTU 从站
-```
-
-测试命令：
-
-```powershell
-.\scripts\test_serial_gateway.ps1 -Serial COM4 -Gateway 10.83.2.40:1234
-```
-
-可用套件：
-
-```text
-basic
-advanced
-boundary
-stress
-all
-```
-
-推荐先跑：
-
-```powershell
-.\scripts\test_serial_gateway.ps1 -Suite advanced -Timeout 5s
-.\scripts\test_serial_gateway.ps1 -Suite boundary -BoundaryBits 500 -BoundaryRegisters 80 -BoundaryWriteBits 500 -BoundaryWriteRegisters 80 -Timeout 10s
-.\scripts\test_serial_gateway.ps1 -Suite stress -StressCount 100 -StressDelay 50ms -Timeout 5s
-```
-
-说明：LoRa 链路不适合直接按 Modbus RTU 理论最大帧长压测。完整协议上限帧可能因为空口 MTU、分片、排队、半双工延迟或网关缓存限制而超时。当前较小边界帧和高级功能码已经验证通过，大帧超时应优先按链路容量或延迟问题分析。
 
 ## 已支持的功能码
 

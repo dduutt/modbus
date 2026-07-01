@@ -118,17 +118,6 @@ go run ./examples/rtu_over_tcp_loopback
 go run ./examples/tags_loopback
 ```
 
-Hardware verification on the current TCP -> LoRa gateway -> LoRa node ->
-serial -> PC loopback:
-
-- `advanced` passed with `-Timeout 5s`.
-- `boundary` passed with `-BoundaryBits 500 -BoundaryRegisters 80
-  -BoundaryWriteBits 500 -BoundaryWriteRegisters 80 -Timeout 10s`.
-- `stress` passed with `-StressCount 100 -StressDelay 50ms -Timeout 5s`.
-- Full protocol-limit boundary frames timed out on this LoRa path, so those
-  failures are treated as link-capacity/latency limits rather than protocol
-  implementation failures.
-
 ## Optional Future Work
 
 - Modbus ASCII transport if a target device requires it.

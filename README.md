@@ -1,14 +1,8 @@
 # modbus
 
-`modbus` 是一个 Go 语言 Modbus 库，支持 Modbus TCP、Modbus RTU、RTU-over-TCP，以及 TCP/RTU 从站模拟。
+`github.com/dduutt/modbus` 是一个 Go 语言 Modbus 通信库，提供客户端、传输层、协议编解码、数据模型和从站模拟能力。
 
-模块路径：
-
-```text
-github.com/dduutt/modbus
-```
-
-Go 包名仍然是 `modbus`，所以外部项目使用时 import 路径是 `github.com/dduutt/modbus`，代码调用仍然是 `modbus.NewClient(...)`。
+当前支持 Modbus TCP、Modbus RTU、RTU-over-TCP，适用于设备通信、网关接入、协议测试、从站模拟和本地自动化验证场景。
 
 ## 功能特性
 

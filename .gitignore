@@ -1,0 +1,9 @@
+.refs/
+bin/
+
+*.exe
+*.test
+*.out
+
+.DS_Store
+Thumbs.db

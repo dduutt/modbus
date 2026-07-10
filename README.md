@@ -94,6 +94,23 @@ func main() {
 }
 ```
 
+需要在上位机或长期运行程序中主动停止从站时，可以使用启动句柄：
+
+```go
+handle, err := modbus.StartTCPServer(ctx, "127.0.0.1:1502", modbus.NewDataStoreHandler(store))
+if err != nil {
+    log.Fatal(err)
+}
+defer handle.Close()
+```
+
+RTU 从站也可以用同样的关闭模型：
+
+```go
+handle := modbus.StartRTUServer(ctx, port, modbus.NewDataStoreHandler(store))
+defer handle.Close()
+```
+
 ### RTU 客户端
 
 RTU 传输层接收任意 `io.ReadWriteCloser`。真实串口可使用 `modbus/serial`：

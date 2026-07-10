@@ -465,13 +465,29 @@ func (s *TCPServer) ListenAndServe(ctx context.Context, address string) error {
 func (s *TCPServer) Serve(ctx context.Context, ln net.Listener) error {
 	var wg sync.WaitGroup
 	errCh := make(chan error, 1)
+	conns := make(map[net.Conn]struct{})
+	var connsMu sync.Mutex
+	closeActiveConns := func() {
+		connsMu.Lock()
+		for conn := range conns {
+			_ = conn.Close()
+		}
+		connsMu.Unlock()
+	}
+	done := make(chan struct{})
+	defer close(done)
 	go func() {
-		<-ctx.Done()
-		_ = ln.Close()
+		select {
+		case <-ctx.Done():
+			_ = ln.Close()
+			closeActiveConns()
+		case <-done:
+		}
 	}()
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
+			closeActiveConns()
 			if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 				wg.Wait()
 				return nil
@@ -483,9 +499,17 @@ func (s *TCPServer) Serve(ctx context.Context, ln net.Listener) error {
 			wg.Wait()
 			return <-errCh
 		}
+		connsMu.Lock()
+		conns[conn] = struct{}{}
+		connsMu.Unlock()
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			defer func() {
+				connsMu.Lock()
+				delete(conns, conn)
+				connsMu.Unlock()
+			}()
 			_ = s.serveConn(ctx, conn)
 		}()
 	}

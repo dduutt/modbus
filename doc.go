@@ -21,6 +21,8 @@
 //
 // Configuration-driven clients can be created with ClientConfig and
 // NewClientFromConfig. For serial RTU, ClientConfig.Conn must already be open.
+// Slave simulations can be run directly with Serve/ListenAndServe or started
+// with StartTCPServer/StartRTUServer when callers need a Close handle.
 //
 // Tag reads and writes support builder-style tags:
 //

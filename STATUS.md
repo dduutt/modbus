@@ -59,6 +59,13 @@
 
 ## Slave Simulation
 
+Lifecycle APIs:
+
+- `TCPServer.Serve` / `TCPServer.ListenAndServe` for caller-managed contexts.
+- `RTUServer.Serve` for caller-managed RTU connections.
+- `StartTCPServer`, `StartTCPServerOn`, and `StartRTUServer` return a
+  `ServerHandle` with `Close`, `Wait`, and `Done`.
+
 `DataStoreHandler` supports:
 
 - Coils

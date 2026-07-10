@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync"
 )
 
 type RTUServer struct {
@@ -15,7 +16,24 @@ func NewRTUServer(handler Handler) *RTUServer {
 }
 
 func (s *RTUServer) Serve(ctx context.Context, conn io.ReadWriteCloser) error {
-	defer conn.Close()
+	done := make(chan struct{})
+	var closeOnce sync.Once
+	closeConn := func() {
+		closeOnce.Do(func() {
+			_ = conn.Close()
+		})
+	}
+	defer func() {
+		close(done)
+		closeConn()
+	}()
+	go func() {
+		select {
+		case <-ctx.Done():
+			closeConn()
+		case <-done:
+		}
+	}()
 	for {
 		select {
 		case <-ctx.Done():
@@ -24,7 +42,7 @@ func (s *RTUServer) Serve(ctx context.Context, conn io.ReadWriteCloser) error {
 		}
 		frame, err := readRTURequest(conn)
 		if err != nil {
-			if errors.Is(err, io.EOF) {
+			if errors.Is(err, io.EOF) || ctx.Err() != nil {
 				return nil
 			}
 			return err
@@ -38,6 +56,9 @@ func (s *RTUServer) Serve(ctx context.Context, conn io.ReadWriteCloser) error {
 			return err
 		}
 		if _, err := conn.Write(out); err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
 			return err
 		}
 	}

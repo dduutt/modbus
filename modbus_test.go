@@ -67,6 +67,44 @@ func TestTCPClientServer(t *testing.T) {
 	}
 }
 
+func TestStartTCPServerHandleClose(t *testing.T) {
+	store := NewMemoryDataStore()
+	if err := store.WriteHoldingRegisters(0, []uint16{10}); err != nil {
+		t.Fatal(err)
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handle := StartTCPServerOn(context.Background(), ln, NewDataStoreHandler(store))
+	client := NewClient(NewTCPTransport(ln.Addr().String()), WithTimeout(time.Second))
+	defer client.Close()
+
+	if _, err := client.ReadHoldingRegisters(context.Background(), 0, 1); err != nil {
+		t.Fatal(err)
+	}
+	closeErr := make(chan error, 1)
+	go func() {
+		closeErr <- handle.Close()
+	}()
+	select {
+	case err := <-closeErr:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("server Close timed out")
+	}
+	if err := handle.Close(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-handle.Done():
+	default:
+		t.Fatal("server handle is not done after Close")
+	}
+}
+
 func TestTCPTransportDoesNotRetryCurrentRequestAfterConnectionError(t *testing.T) {
 	ctx := context.Background()
 	var dials atomic.Int32
@@ -1023,6 +1061,28 @@ func TestRTUClientServer(t *testing.T) {
 	}
 	if regs[0] != 42 {
 		t.Fatalf("unexpected registers: %#v", regs)
+	}
+}
+
+func TestStartRTUServerHandleCloseStopsBlockedRead(t *testing.T) {
+	clientConn, serverConn := net.Pipe()
+	defer clientConn.Close()
+	handle := StartRTUServer(context.Background(), serverConn, NewDataStoreHandler(NewMemoryDataStore()))
+
+	closeErr := make(chan error, 1)
+	go func() {
+		closeErr <- handle.Close()
+	}()
+	select {
+	case err := <-closeErr:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("rtu server Close timed out")
+	}
+	if err := handle.Close(); err != nil {
+		t.Fatal(err)
 	}
 }
 

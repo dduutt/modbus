@@ -355,8 +355,6 @@ go run ./examples/advanced_loopback
 
 ## 测试
 
-所有验证都通过 Go 工具链执行，不再依赖 PowerShell 脚本。
-
 基础测试：
 
 ```text
@@ -383,7 +381,7 @@ go test -run '^$' -bench BenchmarkComparisonTCP -benchmem -benchtime=2s -count=3
 
 ## 可靠性测试
 
-仓库内新增了覆盖范围更广的 Go 测试，用于替代原有脚本式验证：
+可靠性测试覆盖常见采集、读写、协议扩展和并发场景：
 
 - `TestReliabilityTCPScenarioMatrix`：覆盖 TCP 读写线圈、离散输入、保持寄存器、输入寄存器、诊断、通信事件、Server ID、文件记录、FIFO 和设备识别。
 - `TestReliabilityRTUOverTCPTagBatching`：覆盖 RTU-over-TCP 上的 `ReadTags` / `WriteTags`、浮点、整数和线圈批量读写。
@@ -401,7 +399,7 @@ go test -run '^$' -bench BenchmarkComparisonTCP -benchmem -benchtime=2s -count=3
 - `WriteTag`
 - `ReadWriteMultipleRegisters`
 
-当前验证结果：
+推荐验证命令：
 
 | 测试项 | 命令 | 结果 |
 | --- | --- | --- |
@@ -447,7 +445,7 @@ go test -run '^$' -bench BenchmarkComparisonTCP -benchmem -benchtime=2s -count=3
 结论：
 
 - 两者在本机 TCP 回环场景下延迟接近。
-- `simonvetter/modbus` 在本轮多场景 benchmark 中延迟和每次操作分配字节略低。
+- `simonvetter/modbus` 在该组多场景 benchmark 中延迟和每次操作分配字节略低。
 - 本项目在所有对比场景中每次操作分配次数更少。
 - Windows 本机 TCP 回环存在调度抖动，性能结论建议以多轮中位数为准。
 

@@ -78,6 +78,18 @@ if err := client.Connect(ctx); err != nil {
 
 `Connect` 是可选的。不调用时，TCP 和 RTU-over-TCP 会在第一次请求时自动连接；RTU 串口连接仍由调用方打开后传入。
 
+同一连接访问多个 Unit ID 时，可以派生轻量 client 视图：
+
+```go
+meter1 := client.ForUnit(1)
+meter2 := client.ForUnit(2)
+
+regs1, err := meter1.ReadHoldingRegisters(ctx, 0, 10)
+regs2, err := meter2.ReadHoldingRegisters(ctx, 0, 10)
+```
+
+`ForUnit` 不会修改原 client；派生 client 共享同一个底层连接，关闭任意一个视图都会关闭共享连接。
+
 ### TCP 从站模拟
 
 ```go

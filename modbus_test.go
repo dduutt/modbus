@@ -190,6 +190,47 @@ func TestTCPTransportConnectDialsOnce(t *testing.T) {
 	}
 }
 
+func TestClientForUnitSharesTransport(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		_ = NewTCPServer(unitHoldingHandler{values: map[byte]uint16{1: 11, 2: 22}}).Serve(ctx, ln)
+	}()
+
+	var dials atomic.Int32
+	transport := NewTCPTransport("unused", WithTCPDialer(func(ctx context.Context, network, address string) (net.Conn, error) {
+		dials.Add(1)
+		return (&net.Dialer{}).DialContext(ctx, network, ln.Addr().String())
+	}))
+	client := NewClient(transport, WithUnitID(1), WithTimeout(time.Second))
+	defer client.Close()
+	if same := client.ForUnit(1); same != client {
+		t.Fatal("ForUnit with the current unit should return the same client")
+	}
+
+	values, err := client.ReadHoldingRegisters(ctx, 0, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !uint16SlicesEqual(values, []uint16{11}) {
+		t.Fatalf("unit 1 values=%#v", values)
+	}
+	values, err = client.ForUnit(2).ReadHoldingRegisters(ctx, 0, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !uint16SlicesEqual(values, []uint16{22}) {
+		t.Fatalf("unit 2 values=%#v", values)
+	}
+	if got := dials.Load(); got != 1 {
+		t.Fatalf("ForUnit did not share transport: dials=%d", got)
+	}
+}
+
 func TestClientConnectWithoutConnector(t *testing.T) {
 	client := NewClient(noConnectTransport{})
 	if err := client.Connect(context.Background()); err != nil {
@@ -1799,6 +1840,25 @@ func (noConnectTransport) Do(context.Context, byte, PDU) (PDU, error) {
 
 func (noConnectTransport) Close() error {
 	return nil
+}
+
+type unitHoldingHandler struct {
+	values map[byte]uint16
+}
+
+func (h unitHoldingHandler) Handle(_ context.Context, unitID byte, request PDU) (PDU, error) {
+	if request.Function != FuncReadHoldingRegisters || len(request.Data) != 4 {
+		return exceptionPDU(request.Function, ExceptionIllegalFunction), nil
+	}
+	quantity := uint16At(request.Data[2:])
+	if quantity != 1 {
+		return exceptionPDU(request.Function, ExceptionIllegalDataValue), nil
+	}
+	value, ok := h.values[unitID]
+	if !ok {
+		return exceptionPDU(request.Function, ExceptionIllegalDataAddress), nil
+	}
+	return PDU{Function: request.Function, Data: []byte{2, byte(value >> 8), byte(value)}}, nil
 }
 
 func mustRTUFrame(t *testing.T, unitID byte, pdu PDU) []byte {

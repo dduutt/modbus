@@ -53,6 +53,18 @@ func (c *Client) Close() error {
 	return c.transport.Close()
 }
 
+// ForUnit returns a client view that uses the same transport with a different
+// Modbus unit ID. It does not modify the source client. Closing any view closes
+// the shared transport.
+func (c *Client) ForUnit(unitID byte) *Client {
+	if unitID == c.unitID {
+		return c
+	}
+	clone := *c
+	clone.unitID = unitID
+	return &clone
+}
+
 func (c *Client) do(ctx context.Context, req PDU) (PDU, error) {
 	if c.timeout > 0 {
 		var cancel context.CancelFunc
@@ -293,12 +305,7 @@ func (c *Client) WriteTags(ctx context.Context, values map[string]TagValue) erro
 }
 
 func (c *Client) withUnitID(unitID byte) *Client {
-	if unitID == c.unitID {
-		return c
-	}
-	clone := *c
-	clone.unitID = unitID
-	return &clone
+	return c.ForUnit(unitID)
 }
 
 func (c *Client) ReadTags(ctx context.Context, tags map[string]Tag) (map[string]Value, error) {

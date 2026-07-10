@@ -355,37 +355,71 @@ go run ./examples/advanced_loopback
 
 ## 测试
 
+所有验证都通过 Go 工具链执行，不再依赖 PowerShell 脚本。
+
 基础测试：
 
-```powershell
+```text
 go test -count=1 ./...
 ```
 
-完整本地验证：
+race 检测：
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\test_all_local.ps1
+```text
+go test -race -count=1 ./...
 ```
 
-包含 race 检测：
+静态检查：
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\test_all_local.ps1 -Race
+```text
+go vet ./...
 ```
+
+对比 benchmark：
+
+```text
+go test -run '^$' -bench BenchmarkComparisonTCP -benchmem -benchtime=2s -count=3
+```
+
+## 可靠性测试
+
+仓库内新增了覆盖范围更广的 Go 测试，用于替代原有脚本式验证：
+
+- `TestReliabilityTCPScenarioMatrix`：覆盖 TCP 读写线圈、离散输入、保持寄存器、输入寄存器、诊断、通信事件、Server ID、文件记录、FIFO 和设备识别。
+- `TestReliabilityRTUOverTCPTagBatching`：覆盖 RTU-over-TCP 上的 `ReadTags` / `WriteTags`、浮点、整数和线圈批量读写。
+- `TestReliabilityTagAcquisitionAccuracy`：覆盖 `ReadTags` 批量采集准确性，包含 coils、discrete inputs、holding registers、input registers、`bool`、`int16`、`uint16`、`int32`、`uint32`、`float32`、`int64`、`uint64`、`float64`、`bytes`、`string` 以及 byte/word order 组合。
+- `TestReliabilityTagAcquisitionErrorDoesNotReturnPartialData`：验证采集异常时返回错误，不返回部分成功数据。
+- `TestReliabilityConcurrentTCPClients`：启动 TCP server，并使用 32 个 TCP client 并发执行 6,400 次读写操作。
+
+并发测试包含：
+
+- `ReadHoldingRegisters`
+- `WriteSingleRegister`
+- `WriteMultipleRegisters`
+- `WriteMultipleCoils`
+- `ReadTag`
+- `WriteTag`
+- `ReadWriteMultipleRegisters`
+
+当前验证结果：
+
+| 测试项 | 命令 | 结果 |
+| --- | --- | --- |
+| 单元与可靠性测试 | `go test -count=1 ./...` | 通过 |
+| race 检测 | `go test -race -count=1 ./...` | 通过 |
+| 静态检查 | `go vet ./...` | 通过 |
 
 ## 性能对比
 
-以下结果用于和 [`github.com/simonvetter/modbus`](https://github.com/simonvetter/modbus) 做同机参考对比，不代表不同硬件、系统或真实工业网络下的绝对性能。
+以下结果用于和 [`github.com/simonvetter/modbus`](https://github.com/simonvetter/modbus) 做同机参考对比，不代表不同硬件、系统或真实工业网络下的绝对性能。对比代码在 `comparison_benchmark_test.go` 中，可直接通过 `go test -bench` 复现。
 
 测试口径：
 
 - 两边都使用各自的 TCP client 和 TCP server。
 - 本机 `127.0.0.1` 回环，长连接复用。
-- 功能码为 `0x03 Read Holding Registers`。
-- 每次读取 3 个 holding registers。
+- 覆盖读保持寄存器、写保持寄存器、读线圈、写线圈和混合读写。
 - 不包含 Tag/Value 解码。
 - 对方库版本：`github.com/simonvetter/modbus v1.6.4`。
-- 本项目版本：`018c3e4`。
 
 测试环境：
 
@@ -396,23 +430,26 @@ cpu: 13th Gen Intel(R) Core(TM) i7-1370P
 
 测试命令：
 
-```powershell
-go test -run '^$' -bench . -benchmem -benchtime=3s -count=5
+```text
+go test -run '^$' -bench BenchmarkComparisonTCP -benchmem -benchtime=2s -count=3
 ```
 
-结果按 5 轮中位数统计：
+结果按 3 轮中位数统计：
 
-| 库 | benchmark | ns/op | ops/s | B/op | allocs/op |
-| --- | --- | ---: | ---: | ---: | ---: |
-| `github.com/dduutt/modbus` | TCP read holding registers | 81,079 | 12,333 | 496 | 17 |
-| `github.com/simonvetter/modbus` | TCP read holding registers | 78,575 | 12,727 | 336 | 22 |
+| 场景 | 本项目 ns/op | 本项目 B/op | 本项目 allocs/op | simonvetter ns/op | simonvetter B/op | simonvetter allocs/op |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| read holding registers | 15,882 | 568 | 17 | 15,688 | 424 | 24 |
+| write holding registers | 15,825 | 552 | 16 | 15,548 | 416 | 23 |
+| read coils | 15,796 | 512 | 17 | 15,594 | 352 | 22 |
+| write coils | 15,884 | 496 | 16 | 15,615 | 328 | 20 |
+| mixed read/write | 15,999 | 516 | 16 | 15,839 | 356 | 21 |
 
 结论：
 
-- 两者在本机 TCP 回环读寄存器场景下延迟接近。
-- `simonvetter/modbus` 本轮中位延迟约低 3.1%，每次操作分配字节更少。
-- 本项目每次操作分配次数更少。
-- Windows 本机 TCP 回环存在明显抖动，性能结论建议以多轮中位数为准。
+- 两者在本机 TCP 回环场景下延迟接近。
+- `simonvetter/modbus` 在本轮多场景 benchmark 中延迟和每次操作分配字节略低。
+- 本项目在所有对比场景中每次操作分配次数更少。
+- Windows 本机 TCP 回环存在调度抖动，性能结论建议以多轮中位数为准。
 
 ## 连接与重试策略
 

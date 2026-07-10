@@ -76,32 +76,29 @@ package main
 import (
     "context"
     "log"
+    "os"
+    "os/signal"
+    "syscall"
 
     "github.com/dduutt/modbus"
 )
 
 func main() {
-    ctx := context.Background()
+    ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+    defer stop()
 
     store := modbus.NewMemoryDataStore()
     _ = store.WriteHoldingRegisters(0, []uint16{100, 200, 300})
     _ = store.WriteCoils(0, []bool{true, false, true})
 
-    server := modbus.NewTCPServer(modbus.NewDataStoreHandler(store))
-    if err := server.ListenAndServe(ctx, "127.0.0.1:1502"); err != nil {
+    handle, err := modbus.StartTCPServer(ctx, "127.0.0.1:1502", modbus.NewDataStoreHandler(store))
+    if err != nil {
         log.Fatal(err)
     }
-}
-```
+    defer handle.Close()
 
-需要在上位机或长期运行程序中主动停止从站时，可以使用启动句柄：
-
-```go
-handle, err := modbus.StartTCPServer(ctx, "127.0.0.1:1502", modbus.NewDataStoreHandler(store))
-if err != nil {
-    log.Fatal(err)
+    <-ctx.Done()
 }
-defer handle.Close()
 ```
 
 RTU 从站也可以用同样的关闭模型：

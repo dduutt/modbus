@@ -35,6 +35,20 @@ func NewRTUClient(conn io.ReadWriteCloser, opts ...Option) *Client {
 	return NewClient(NewRTUTransport(conn), opts...)
 }
 
+// Connect establishes the underlying connection when the transport supports
+// explicit connection. Transports without a separate connect step return nil.
+func (c *Client) Connect(ctx context.Context) error {
+	if c.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, c.timeout)
+		defer cancel()
+	}
+	if transport, ok := c.transport.(connector); ok {
+		return transport.Connect(ctx)
+	}
+	return nil
+}
+
 func (c *Client) Close() error {
 	return c.transport.Close()
 }

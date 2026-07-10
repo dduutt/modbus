@@ -68,6 +68,16 @@ client := modbus.NewTCPClient("127.0.0.1:502", modbus.WithUnitID(1))
 defer client.Close()
 ```
 
+如果希望在启动阶段提前发现设备离线、端口不可达等连接问题，可以显式连接：
+
+```go
+if err := client.Connect(ctx); err != nil {
+    panic(err)
+}
+```
+
+`Connect` 是可选的。不调用时，TCP 和 RTU-over-TCP 会在第一次请求时自动连接；RTU 串口连接仍由调用方打开后传入。
+
 ### TCP 从站模拟
 
 ```go

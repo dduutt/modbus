@@ -77,6 +77,16 @@ func (t *TCPTransport) Do(ctx context.Context, unitID byte, request PDU) (PDU, e
 	return frame.PDU, nil
 }
 
+func (t *TCPTransport) Connect(ctx context.Context) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.closed {
+		return ErrClosed
+	}
+	_, err := t.ensureConn(ctx)
+	return err
+}
+
 func (t *TCPTransport) Close() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()

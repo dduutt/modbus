@@ -57,6 +57,16 @@ func (t *RTUOverTCPTransport) Do(ctx context.Context, unitID byte, request PDU) 
 	return resp, nil
 }
 
+func (t *RTUOverTCPTransport) Connect(ctx context.Context) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.closed {
+		return ErrClosed
+	}
+	_, err := t.ensureTransport(ctx)
+	return err
+}
+
 func (t *RTUOverTCPTransport) Close() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()

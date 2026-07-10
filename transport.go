@@ -12,6 +12,10 @@ type Transport interface {
 	Close() error
 }
 
+type connector interface {
+	Connect(ctx context.Context) error
+}
+
 type Option func(*clientOptions)
 
 type clientOptions struct {

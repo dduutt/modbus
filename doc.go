@@ -8,6 +8,10 @@
 //		modbus.WithUnitID(1),
 //	)
 //
+// TCP and RTU-over-TCP clients connect lazily on the first request. Call
+// client.Connect(ctx) when an application wants to establish the connection
+// during startup or fail fast before issuing requests.
+//
 // RTU clients use any io.ReadWriteCloser. The root package does not open
 // operating-system serial ports directly; use the modbus/serial adapter or pass
 // an application-owned connection into NewRTUTransport.

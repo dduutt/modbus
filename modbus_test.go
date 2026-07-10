@@ -161,6 +161,42 @@ func TestTCPTransportDoesNotRetryCurrentRequestAfterConnectionError(t *testing.T
 	}
 }
 
+func TestTCPTransportConnectDialsOnce(t *testing.T) {
+	ctx := context.Background()
+	var dials atomic.Int32
+	transport := NewTCPTransport("unused", WithTCPDialer(func(context.Context, string, string) (net.Conn, error) {
+		dials.Add(1)
+		clientConn, serverConn := net.Pipe()
+		t.Cleanup(func() { _ = serverConn.Close() })
+		return clientConn, nil
+	}))
+	client := NewClient(transport, WithTimeout(time.Second))
+	defer client.Close()
+
+	if err := client.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := dials.Load(); got != 1 {
+		t.Fatalf("Connect dialed %d times, want 1", got)
+	}
+	if err := client.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Connect(ctx); !errors.Is(err, ErrClosed) {
+		t.Fatalf("Connect after Close error=%v, want ErrClosed", err)
+	}
+}
+
+func TestClientConnectWithoutConnector(t *testing.T) {
+	client := NewClient(noConnectTransport{})
+	if err := client.Connect(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestReadWriteMultipleRegistersTCP(t *testing.T) {
 	store := NewMemoryDataStore()
 	if err := store.WriteHoldingRegisters(0, []uint16{10, 20, 30, 40}); err != nil {
@@ -1340,6 +1376,38 @@ func TestRTUOverTCPTransportDoesNotRetryCurrentRequestAfterConnectionError(t *te
 	}
 }
 
+func TestRTUOverTCPTransportConnectDialsOnce(t *testing.T) {
+	ctx := context.Background()
+	var dials atomic.Int32
+	transport := NewRTUOverTCPTransport("unused",
+		WithRTUOverTCPDialer(func(context.Context, string, string) (net.Conn, error) {
+			dials.Add(1)
+			clientConn, serverConn := net.Pipe()
+			t.Cleanup(func() { _ = serverConn.Close() })
+			return clientConn, nil
+		}),
+		WithRTUOverTCPTimeout(time.Second),
+	)
+	client := NewClient(transport, WithTimeout(time.Second))
+	defer client.Close()
+
+	if err := client.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := dials.Load(); got != 1 {
+		t.Fatalf("Connect dialed %d times, want 1", got)
+	}
+	if err := client.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Connect(ctx); !errors.Is(err, ErrClosed) {
+		t.Fatalf("Connect after Close error=%v, want ErrClosed", err)
+	}
+}
+
 func TestNewClientFromConfigTCP(t *testing.T) {
 	store := NewMemoryDataStore()
 	if err := store.WriteHoldingRegisters(0, []uint16{42}); err != nil {
@@ -1721,6 +1789,16 @@ func (r *chunkedReader) Read(p []byte) (int, error) {
 	copy(p, r.data[:n])
 	r.data = r.data[n:]
 	return n, nil
+}
+
+type noConnectTransport struct{}
+
+func (noConnectTransport) Do(context.Context, byte, PDU) (PDU, error) {
+	return PDU{}, nil
+}
+
+func (noConnectTransport) Close() error {
+	return nil
 }
 
 func mustRTUFrame(t *testing.T, unitID byte, pdu PDU) []byte {
